@@ -13,7 +13,7 @@ using std::endl;
 namespace po = boost::program_options; // Define namespace for using program_options
 
 // Declare functions to be defined below
-vector< vector<float> > read_matrix(string filepath);
+vector< vector<string> > read_matrix(string filepath);
 
 
 
@@ -67,7 +67,7 @@ catch(exception& e) {
 }
 
 
-vector< vector<float> > fixed = read_matrix(fixed_filepath);
+vector< vector<string> > fixed = read_matrix(fixed_filepath);
     //   P R I N T    O U T    T H E    2 D    V E C T O R
 for(int row=0; row < fixed.size(); row++)
 {
@@ -96,10 +96,10 @@ vector<float> SVD(vector<float> p, vector<float> pi)
 //   F U N C T I O N    T O    R E A D    M A T R I C E S   F R O M    T E X T F I L E
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-vector< vector<float> > read_matrix(string filepath)
+vector< vector<string> > read_matrix(string filepath)
 {
     
-    std::vector<std::vector<float> > two_D_array;
+    vector< vector<string> > two_D_array;
 
     // Create a filestream object (read only)
     ifstream myfile;
@@ -128,7 +128,7 @@ vector< vector<float> > read_matrix(string filepath)
             for (int c=0; c<tokens.size(); c++){flVect[c] = std::stof(tokens[c]);}
     
             // Add this vector as a new line in the 2D vector
-            two_D_array.push_back(flVect); 
+            two_D_array.push_back(tokens); 
             }
 
         }
