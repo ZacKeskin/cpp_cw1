@@ -4,6 +4,8 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
+#include <eigen3/Eigen/Dense>
+
 
 #include "../headers/exceptions.h"
 
@@ -11,6 +13,7 @@ using std::cout;
 using std::cout;
 using std::endl;
 namespace po = boost::program_options; // Define namespace for using program_options
+namespace eig = Eigen; 
 
 // Declare functions to be defined below
 vector< vector<string> > read_matrix(string filepath);
@@ -66,8 +69,13 @@ catch(exception& e) {
     return 1;
 }
 
-
+ // Read in list of Vectors for fixed point sets 
 vector< vector<string> > fixed = read_matrix(fixed_filepath);
+
+ // Read in list of Vectors for moving point sets 
+vector< vector<string> > moving = read_matrix(fixed_filepath);
+
+
     //   P R I N T    O U T    T H E    2 D    V E C T O R
 for(int row=0; row < fixed.size(); row++)
 {
@@ -87,8 +95,9 @@ return 0;
 //   F U N C T I O N    T O    P E R F O R M     A R U N'S    S V D    O N   T W O   M A T R I C E S
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-vector<float> SVD(vector<float> p, vector<float> pi)
+eig::Matrix4f  SVD(eig::Vector3f p, eig::Vector3f pi)
 {
+    //  Step1: From {pi},{pi_prime} calculate p, p_prime; and then N(here,piandp'areconsideredas3x1column {q}. 
 
 }
 
@@ -139,4 +148,64 @@ vector< vector<string> > read_matrix(string filepath)
 
 
 return two_D_array;
+}
+
+eig::MatrixXf read_matrix_new(string filepath)
+{
+// Create a filestream object (read only)
+    ifstream myfile;
+    // Use it to open our text file
+    myfile.open (filepath, ios::out); 
+    eig::MatrixXf point_matrix;
+
+    // Check that the file was successfully opened
+    if (myfile.is_open()) 
+        {
+        string line;    
+
+        // Read all lines in the file
+        while ( getline (myfile,line) )
+            {
+
+            string strInput;
+            // Split each line into an array using tab delimiter
+            std::string str = line;
+            std::vector<float> tokens;
+            //boost::split(tokens, line, boost::is_any_of("\t"));
+
+            eig::Vector3f row_vector;
+            std::stringstream lineStream(line);
+            std::string cell;
+            while (std::getline(lineStream, cell, '\t')) {
+                tokens.push_back(std::stod(cell));
+                }
+            eig::Map<eig::Vector3f> eig_vector(tokens.data());
+
+            point_matrix.conservativeResize(point_matrix.rows(), point_matrix.cols()+1);
+            point_matrix.col(point_matrix.cols()-1) = eig_vector;
+
+            
+
+
+            }
+        }
+
+return point_matrix;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//   F U N C T I O N    T O    R E T U R N     S S D
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+float SSD(eig::Vector3f pi_prime, eig::Vector3f pi, Eigen::Matrix3f R, Eigen::Vector3f T)
+{
+    float sum_SD = 0.0f;
+    //for each pointset/row 
+        // sum the squared difference
+    float SD = (pi_prime - (R * pi + T)).squaredNorm() ;
+    
+    return sum_SD;
 }
