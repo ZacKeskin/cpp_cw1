@@ -6,7 +6,6 @@
 #include <boost/lexical_cast.hpp>
 #include <eigen3/Eigen/Dense>
 
-
 #include "../headers/exceptions.h"
 
 using std::cout;
@@ -17,7 +16,7 @@ namespace eig = Eigen;
 
 // Declare functions to be defined below
 vector< vector<string> > read_matrix(string filepath);
-
+eig::MatrixXf read_matrix_new(string filepath);
 
 
 int main(int ac, char* av[])
@@ -70,21 +69,13 @@ catch(exception& e) {
 }
 
  // Read in list of Vectors for fixed point sets 
-vector< vector<string> > fixed = read_matrix(fixed_filepath);
-
+//vector< vector<string> > fixed = read_matrix(fixed_filepath);
+eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
  // Read in list of Vectors for moving point sets 
 vector< vector<string> > moving = read_matrix(fixed_filepath);
 
 
-    //   P R I N T    O U T    T H E    2 D    V E C T O R
-for(int row=0; row < fixed.size(); row++)
-{
-for (int col=0; col < fixed[row].size(); col++)
-    {
-        std::cout << fixed[row][col] ;
-    }
-    std::cout << endl;
-};
+std::cout << fixed << endl;
 
 return 0;
 }
@@ -156,7 +147,7 @@ eig::MatrixXf read_matrix_new(string filepath)
     ifstream myfile;
     // Use it to open our text file
     myfile.open (filepath, ios::out); 
-    eig::MatrixXf point_matrix;
+    eig::MatrixXf point_matrix(0,3);
 
     // Check that the file was successfully opened
     if (myfile.is_open()) 
@@ -170,26 +161,33 @@ eig::MatrixXf read_matrix_new(string filepath)
             string strInput;
             // Split each line into an array using tab delimiter
             std::string str = line;
-            std::vector<float> tokens;
+            std::vector<float> std_row_vector(3);
             //boost::split(tokens, line, boost::is_any_of("\t"));
 
+            // Declare variables used to receive data from file
             eig::Vector3f row_vector;
-            std::stringstream lineStream(line);
+            std::istringstream lineStream(line);
             std::string cell;
-            while (std::getline(lineStream, cell, '\t')) {
-                tokens.push_back(std::stod(cell));
-                }
-            eig::Map<eig::Vector3f> eig_vector(tokens.data());
-
-            point_matrix.conservativeResize(point_matrix.rows(), point_matrix.cols()+1);
-            point_matrix.col(point_matrix.cols()-1) = eig_vector;
-
+            int i = 0;
             
+            // Iterate over the line (skipping whitespace with std::ws())
+            while (std::getline(std::ws(lineStream), cell, ' ')) {
+                // Iterate through the row to add each element to the std::row_vector
+                std_row_vector[i] = std::stof(cell);
+                i++;
+                }
+            
+            // Map this filled std::vector into an Eigen::vector
+            eig::Map<eig::Vector3f> eig_vector(std_row_vector.data());
 
-
+            // Append the Eigen::vector to the Eigen::matrix
+            point_matrix.conservativeResize(point_matrix.rows()+1, point_matrix.cols());
+            point_matrix.row(point_matrix.rows()-1) = eig_vector;
+            
             }
+            
         }
-
+cout << endl;
 return point_matrix;
 }
 
