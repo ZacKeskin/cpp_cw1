@@ -17,7 +17,7 @@ namespace eig = Eigen;
 // Declare functions to be defined below
 vector< vector<string> > read_matrix(string filepath);
 eig::MatrixXf read_matrix_new(string filepath);
-
+eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s);
 
 int main(int ac, char* av[])
 {
@@ -68,17 +68,19 @@ catch(exception& e) {
     return 1;
 }
 
- // Read in list of Vectors for fixed point sets 
-//vector< vector<string> > fixed = read_matrix(fixed_filepath);
-eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
+
+
  // Read in list of Vectors for moving point sets 
-vector< vector<string> > moving = read_matrix(fixed_filepath);
+eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
+eig::MatrixXf moving = read_matrix_new(moving_filepath);
 
 
-std::cout << fixed << endl;
+// Employ Arun's SVD method to calculate output matrix
+eig::MatrixXf test = SVD(fixed, moving);
+cout << test << endl;
 
 return 0;
-}
+} // End of Main() function
 
 
 
@@ -86,10 +88,44 @@ return 0;
 //   F U N C T I O N    T O    P E R F O R M     A R U N'S    S V D    O N   T W O   M A T R I C E S
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-eig::Matrix4f  SVD(eig::Vector3f p, eig::Vector3f pi)
+eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'} 
 {
-    //  Step1: From {pi},{pi_prime} calculate p, p_prime; and then N(here,piandp'areconsideredas3x1column {q}. 
+    using namespace eig;
 
+    //  Step 1: From {Pi},{Pi'} calculate means Pi and Pi';
+    VectorXf pi = ps.colwise().mean();
+    VectorXf pi1 = p1s.colwise().mean();
+
+    // and then calculate error qi and qi';
+    MatrixXf qs = -(ps.transpose().colwise() -= pi).transpose();
+    MatrixXf q1s = -(p1s.transpose().colwise() -= pi1).transpose();
+
+
+    // Step 2: Calculate the 3 x 3 matrix H
+    MatrixXf H = MatrixXf::Zero(qs.cols(),qs.cols());
+    for (int i = 0; i < qs.rows(); i++ ){
+        H += (q1s.row(i).transpose() * qs.row(i));
+    }
+    
+    
+    // Step 3: Calculate the SVD of matrix H
+    JacobiSVD<MatrixXf> svd(H, ComputeThinU | ComputeThinV);
+    MatrixXf U = svd.matrixU();
+    MatrixXf V = svd.matrixV();
+    
+
+    // Step 4: Calculate matrix X = VU'
+    MatrixXf X = V * U.transpose();
+
+
+    // Step 5: Calculate determinant of X
+    cout << "Det(X) = " << X.determinant() << endl;
+    if (X.determinant() == -1){ cout << "Error! Determinant = -1";}
+    
+    // Step 6: Include Translation vector to return 4x4 matri
+    X.conservativeResize(X.rows()+1,X.cols()+1);
+
+    return X;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
