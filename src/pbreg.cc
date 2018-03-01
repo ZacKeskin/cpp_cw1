@@ -205,17 +205,12 @@ eig::MatrixXf read_matrix_new(string filepath)
     if (myfile.is_open()) 
         {
         string line;    
-
         // Read all lines in the file
         while ( getline (myfile,line) )
             {
-
-            string strInput;
             // Split each line into an array using tab delimiter
             std::string str = line;
-            //std::string tokens;
-            //boost::split(tokens, line, boost::is_any_of(" "));
-            
+
             // Declare variables used to receive data from file
             eig::Vector3f row_vector;
             std::istringstream lineStream(line);
@@ -237,10 +232,7 @@ eig::MatrixXf read_matrix_new(string filepath)
                     // Create a new point-vector
                     std::vector<float> point_vector(3);}
                 }           
-            
-            
-            }
-            
+            }   
         }
 cout << endl;
 return point_matrix;
