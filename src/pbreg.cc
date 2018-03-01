@@ -213,28 +213,31 @@ eig::MatrixXf read_matrix_new(string filepath)
             string strInput;
             // Split each line into an array using tab delimiter
             std::string str = line;
-            std::vector<float> std_row_vector(3);
-            //boost::split(tokens, line, boost::is_any_of("\t"));
-
+            //std::string tokens;
+            //boost::split(tokens, line, boost::is_any_of(" "));
+            
             // Declare variables used to receive data from file
             eig::Vector3f row_vector;
             std::istringstream lineStream(line);
             std::string cell;
-            int i = 0;
             
+            int i = 0;
+            std::vector<float> point_vector(3);
             // Iterate over the line (skipping whitespace with std::ws())
             while (std::getline(std::ws(lineStream), cell, ' ')) {
-                // Iterate through the row to add each element to the std::row_vector
-                std_row_vector[i] = std::stof(cell);
+                // Iterate through the points in the row. Put each triple into a coordinate vector:
+                point_vector[i%3] = std::stof(cell);
                 i++;
-                }
+                if (i%3 ==0) {
+                    // Map this filled std::vector into an Eigen::vector
+                    eig::Map<eig::Vector3f> eig_vector(point_vector.data());
+                    // Append the Eigen::vector to the Eigen::matrix
+                    point_matrix.conservativeResize(point_matrix.rows()+1, point_matrix.cols());
+                    point_matrix.row(point_matrix.rows()-1) = eig_vector;
+                    // Create a new point-vector
+                    std::vector<float> point_vector(3);}
+                }           
             
-            // Map this filled std::vector into an Eigen::vector
-            eig::Map<eig::Vector3f> eig_vector(std_row_vector.data());
-
-            // Append the Eigen::vector to the Eigen::matrix
-            point_matrix.conservativeResize(point_matrix.rows()+1, point_matrix.cols());
-            point_matrix.row(point_matrix.rows()-1) = eig_vector;
             
             }
             
