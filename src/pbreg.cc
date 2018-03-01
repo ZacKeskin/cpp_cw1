@@ -18,6 +18,7 @@ namespace eig = Eigen;
 vector< vector<string> > read_matrix(string filepath);
 eig::MatrixXf read_matrix_new(string filepath);
 eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s);
+float SSD(eig::MatrixXf ps, eig::MatrixXf p1s, Eigen::MatrixXf R, Eigen::VectorXf T);
 
 int main(int ac, char* av[])
 {
@@ -76,7 +77,7 @@ eig::MatrixXf moving = read_matrix_new(moving_filepath);
 
 
 // Employ Arun's SVD method to calculate output matrix
-eig::MatrixXf test = SVD(fixed, moving);
+eig::MatrixXf test = SVD(moving, fixed);
 cout << test << endl;
 
 return 0;
@@ -93,18 +94,19 @@ eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
     using namespace eig;
 
     //  Step 1: From {Pi},{Pi'} calculate means Pi and Pi';
-    VectorXf pi = ps.colwise().mean();
-    VectorXf pi1 = p1s.colwise().mean();
+    VectorXf p = ps.colwise().mean();
+    VectorXf p1 = p1s.colwise().mean();
+
 
     // and then calculate error qi and qi';
-    MatrixXf qs = -(ps.transpose().colwise() -= pi).transpose();
-    MatrixXf q1s = -(p1s.transpose().colwise() -= pi1).transpose();
+    MatrixXf qs = (ps.transpose().colwise() -= p).transpose();
+    MatrixXf q1s = (p1s.transpose().colwise() -= p1).transpose();
 
 
     // Step 2: Calculate the 3 x 3 matrix H
     MatrixXf H = MatrixXf::Zero(qs.cols(),qs.cols());
     for (int i = 0; i < qs.rows(); i++ ){
-        H += (q1s.row(i).transpose() * qs.row(i));
+        H += (qs.row(i).transpose() * q1s.row(i));
     }
     
     
@@ -122,9 +124,23 @@ eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
     cout << "Det(X) = " << X.determinant() << endl;
     if (X.determinant() == -1){ cout << "Error! Determinant = -1";}
     
-    // Step 6: Include Translation vector to return 4x4 matri
-    X.conservativeResize(X.rows()+1,X.cols()+1);
 
+    // Final Steps (i): Calculate Translation vector 
+    VectorXf T = p1 - X * p;
+
+    // Final Steps (ii): Print Sum of Squared Difference
+    cout << "Sum of Squared Difference: " << SSD(ps, p1s, X, T) << endl;
+
+    // Final Steps (iii): Append Translation Vector as final column and expand to return 4x4 matrix
+    X.conservativeResize(X.rows(),X.cols()+1);
+    X.col(X.cols()-1) = T;
+
+    RowVectorXf bottom_row(1,4);
+    bottom_row << 0, 0, 0, 1;
+    X.conservativeResize(X.rows()+1,X.cols());
+    X.row(X.rows()-1) = bottom_row;
+    
+    
     return X;
 }
 
@@ -234,12 +250,16 @@ return point_matrix;
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-float SSD(eig::Vector3f pi_prime, eig::Vector3f pi, Eigen::Matrix3f R, Eigen::Vector3f T)
+float SSD(eig::MatrixXf ps, eig::MatrixXf p1s, Eigen::MatrixXf R, Eigen::VectorXf T)
 {
     float sum_SD = 0.0f;
     //for each pointset/row 
-        // sum the squared difference
-    float SD = (pi_prime - (R * pi + T)).squaredNorm() ;
+    for (int i =0; i< ps.rows(); i++)
+        { // sum the squared difference       
+          float SD = (p1s.row(i).transpose() - (R * ps.row(i).transpose() + T)).squaredNorm() ;
+          sum_SD += SD;
+        }    
+    
     
     return sum_SD;
 }
