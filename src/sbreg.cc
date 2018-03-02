@@ -6,7 +6,28 @@
 using namespace std;
 namespace eig = Eigen;
 
+// Calculate Nearest Neighbours between pointsets
+eig::MatrixXf get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf pointset2)
+{
+    using namespace eig;
+    // Define new empty matrix to store Nearest Neighbours
+    MatrixXf Neighbours(0,3);
+    
+    for (int i=0;i< pointset1.rows(); i++){
+            VectorXf point_i = pointset1.row(i);
 
+             // Find Nearest Neighbour for each fixed point (pi with the minimum Euclidean distance)
+                MatrixXf diff_mat = (pointset2.rowwise() - point_i.transpose()); // Vector distance between pi1 and each point in the transformed pointset
+                VectorXf diff = diff_mat.rowwise().squaredNorm();    // Euclidean distance between pi1 and each point in the transformed pointset
+           
+                int min_index;
+                float min = diff.minCoeff(&min_index);  
+                // Add Nearest Neighbour to new pointset
+                Neighbours.conservativeResize(Neighbours.rows()+1, Neighbours.cols());
+                Neighbours.row(Neighbours.rows()-1) = pointset2.row(min_index);
+            }
+    return Neighbours;
+}
 
 // Get Translation Vector
 eig::VectorXf get_T_vector(eig::MatrixXf R, eig::MatrixXf ps, eig::MatrixXf p1s)
@@ -160,32 +181,22 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
         // Declare empty matrix to store nearest neighbour pointset
         MatrixXf Neighbours(0,3);
         cout << "Loop " << counter << endl;
+
         // Transform the moving data. (Inital loop uses the identity transform).
         MatrixXf transformed_ps = (Transform * ps.transpose()).transpose();
 
-        // For each fixed point pi' find the closest corresponding point in the transformed moving point set T(ps)   
-        for (int i=0;i< p1s.rows(); i++){
-            VectorXf pi1 = p1s.row(i);
+        // Get set of Nearest Neighbours from this transformed data
+        Neighbours = get_Nearest_Neighbours(p1s, transformed_ps); // args(Fixed, Moving)
 
-             // Find Nearest Neighbour for each fixed point (pi with the minimum Euclidean distance)
-                MatrixXf diff_mat = (transformed_ps.rowwise() - pi1.transpose()); // Vector distance between pi1 and each point in the transformed pointset
-                VectorXf diff = diff_mat.rowwise().squaredNorm();    // Euclidean distance between pi1 and each point in the transformed pointset
-           
-                int min_index;
-                float min = diff.minCoeff(&min_index);  
-                // Add Nearest Neighbour to new pointset
-                Neighbours.conservativeResize(Neighbours.rows()+1, Neighbours.cols());
-                Neighbours.row(Neighbours.rows()-1) = transformed_ps.row(min_index);
-            }
-        
         // With Nearest Neighbours pointset, we perform PBReg to get new Transformation
         Transform = SVD(Neighbours, p1s).topLeftCorner(3,3);
 
         // First calculate the Translation Vector T
         VectorXf T = get_T_vector(Transform, Neighbours, p1s);  
+        
         // Then use this to compute the SSD of this transformation
         float new_SSD = get_SSD(Neighbours, p1s, Transform, T);
-        if (get_SSD(Neighbours, p1s, Transform, T) < SSD){
+        if (get_SSD(Neighbours, p1s, Transform, T) <= SSD){
             SSD = new_SSD;
             counter +=1;
         }
