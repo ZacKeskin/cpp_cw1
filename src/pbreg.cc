@@ -15,10 +15,11 @@ namespace po = boost::program_options; // Define namespace for using program_opt
 namespace eig = Eigen; 
 
 // Declare functions to be defined below
-vector< vector<string> > read_matrix(string filepath);
-eig::MatrixXf read_matrix_new(string filepath);
-eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s);
-float SSD(eig::MatrixXf ps, eig::MatrixXf p1s, Eigen::MatrixXf R, Eigen::VectorXf T);
+vector< vector<string> > read_matrix(string);
+eig::MatrixXf read_matrix_new(string);
+eig::MatrixXf SVD(eig::MatrixXf, eig::MatrixXf);
+eig::VectorXf get_T_vector(eig::MatrixXf, eig::MatrixXf, eig::MatrixXf);
+float SSD(eig::MatrixXf, eig::MatrixXf, Eigen::MatrixXf, Eigen::VectorXf);
 
 int main(int ac, char* av[])
 {
@@ -126,7 +127,7 @@ eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
     
 
     // Final Steps (i): Calculate Translation vector 
-    VectorXf T = p1 - X * p;
+    VectorXf T = get_T_vector(X, ps, p1s);
 
     // Final Steps (ii): Print Sum of Squared Difference
     cout << "Sum of Squared Difference: " << SSD(ps, p1s, X, T) << endl;
@@ -238,6 +239,21 @@ cout << endl;
 return point_matrix;
 }
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//   F U N C T I O N    T O    R E T U R N     T R A N S L A T I O N     V E C T O R
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+eig::VectorXf get_T_vector(eig::MatrixXf R, eig::MatrixXf ps, eig::MatrixXf p1s)
+{
+    using namespace eig;
+    // Calculate mean point positions (P and P') for moving and fixed pointsets
+    VectorXf p = ps.colwise().mean();
+    VectorXf p1 = p1s.colwise().mean();
+
+    VectorXf T = p1 - R * p;
+    return T;
+}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
