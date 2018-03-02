@@ -62,8 +62,9 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
     using namespace eig;
 
     // Step 1: Initialise the current transformation to the identity transform 
-    MatrixXf T(3,3);
-    T = MatrixXf::Identity(3,3);
+    MatrixXf Transform(3,3);
+    Transform = MatrixXf::Identity(3,3);
+    MatrixXf transformed_ps (0,3);
 
     // Step 2: Initialise the current SSD to some maximum value. 
     float SSD = 0.1;
@@ -74,12 +75,12 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
     
     while (counter < 1){
     
-        // For each fixed point pi'  
+        // Transform the moving data. inital loop uses the identity transform.
+        //ps = Transform * ps;
+
+        // For each fixed point pi' find the closest corresponding point in the transformed moving point set T(ps)   
         for (int i=0;i< p1s.rows(); i++){
             VectorXf pi1 = p1s.row(i);
-        
-        
-        // find the closest corresponding point in the transformed point set   
         
 
         // Reduce ps with p1
@@ -87,27 +88,31 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
             VectorXf diff;
 
             //diff_mat = (ps.transpose().colwise() - pi1).transpose();
-            diff_mat = (ps.rowwise() - pi1.transpose());
+            diff_mat = (ps.rowwise() - pi1.transpose()); // Vector distance between pi1 and each point in the transformed pointset
+            diff = diff_mat.rowwise().squaredNorm();    // Euclidean distance between pi1 and each point in the transformed pointset
 
-            //cout << diff_mat.topLeftCorner(3,3) << endl << endl;
             
-            diff = diff_mat.rowwise().squaredNorm();
+            //cout << diff_mat.topLeftCorner(3,3) << endl << endl;
             //cout << diff.head(3) << endl << endl;
 
-            
-            // Find pi with minimum Euclidean distance
+            // Find Nearest Neighbour (pi with the minimum Euclidean distance)
             int min_index;
             float min = diff.minCoeff(&min_index);  
-            cout << i << ":     Min. Euclidean Distance:  " << min << "       Index: " << min_index << endl;
+            //cout << i << ":     Min. Euclidean Distance:  " << min << "       Index: " << min_index << endl;
 
-        //p1i.dot()    
-
+            // Add Nearest Neighbour to New_Pointset
+            transformed_ps.conservativeResize(transformed_ps.rows()+1, transformed_ps.cols());
+            transformed_ps.row(transformed_ps.rows()-1) = ps.row(min_index);
         }
 
+        // Use PBReg to return the Least-Squares Transformation
+        //Transform = SVD(transformed_ps,ps);
+
+        cout << transformed_ps.topLeftCorner(3,3) << endl;
         counter +=1;
     }
 
-    return T;
+    return Transform;
 }
 
 
