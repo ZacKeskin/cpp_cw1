@@ -158,7 +158,6 @@ eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
 
 
     // Step 5: Calculate determinant of X
-    cout << "Det(X) = " << X.determinant() << endl;
     if (X.determinant() == -1){ cout << "Error! Determinant = -1";}
     
 
@@ -239,11 +238,12 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //   F U N C T I O N    T O    R E A D    O P T I O N S    F R O M    C O N S O L E 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-std::tuple <string, string, string> get_options(int ac, char* av[])
+std::tuple <string, string, string, string> get_options(int ac, char* av[])
 {
     string fixed_filepath;
     string moving_filepath;
     string output_path;
+    string reg_type;
 
     try {
             // Use Boost::program_options to define command-line options
@@ -251,7 +251,8 @@ std::tuple <string, string, string> get_options(int ac, char* av[])
             desc.add_options()
                 ("fixed",  po::value<string>(), "Filepath of the fixed coordinates textfile")
                 ("moving", po::value<string>(), "Filepath of the fixed coordinates textfile")
-                ("output", po::value<string>(), "Filepath for the output matrix");
+                ("output", po::value<string>(), "Filepath for the output matrix")
+                ("regtype", po::value<string>(), "Filepath for the output matrix");
 
             po::variables_map vm;        
             po::store(po::parse_command_line(ac, av, desc), vm);
@@ -273,6 +274,11 @@ std::tuple <string, string, string> get_options(int ac, char* av[])
             if (vm.count("output")==1) {
                 output_path = vm["output"].as<string>();
             }
+
+            // Read Command-Line options to choose between PBReg or SBReg
+            if (vm.count("regtype")==1) {
+                reg_type = vm["regtype"].as<string>();
+            }
             //else{output_path = "/output/matrix.4x4";}
             //else{throw "user must provide --output option";}
             
@@ -281,12 +287,11 @@ std::tuple <string, string, string> get_options(int ac, char* av[])
 
     catch(exception& e) {
         cerr << "error: " << e.what() << "\n";
-        return std::make_tuple("", "", "");
+        return std::make_tuple("", "", "", "");
     }
 
-    return std::make_tuple(fixed_filepath, moving_filepath, output_path);
+    return std::make_tuple(fixed_filepath, moving_filepath, output_path, reg_type);
 }
-
 
 
 int main(int ac, char* av[])
@@ -295,16 +300,24 @@ int main(int ac, char* av[])
     string fixed_filepath;
     string moving_filepath;
     string output_path;
+    string reg_type;
 
-    std::tie(fixed_filepath, moving_filepath, output_path)  = get_options(ac, av);
+    std::tie(fixed_filepath, moving_filepath, output_path, reg_type)  = get_options(ac, av);
 
     // Read in data for fixed and moving point sets 
     eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
     eig::MatrixXf moving = read_matrix_new(moving_filepath);
 
-    // Employ Arun's SVD method to calculate output matrix
-    eig::MatrixXf test = SVD(moving, fixed);
-    cout << test << endl;
+    if(reg_type=="sbreg"){
+        // Employ Arun's SVD method to calculate output matrix
+        cout << "Performing Surface-Based Registration" << endl;
+        cout << ICP(moving, fixed) << endl;
+    }
+    else{
+        // Employ Arun's SVD method to calculate output matrix
+        cout << "Performing Point-Based Registration" << endl;
+        cout << SVD(moving, fixed) << endl;
+    }
 
     return 0;
 
