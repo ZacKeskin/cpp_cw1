@@ -32,7 +32,7 @@ eig::MatrixXf get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf poin
     return Neighbours;
 }
 
-eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf pointset2)
+eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf pointset2, int n_cores)
 {
     using namespace eig;
     // Define new empty matrix to store Nearest Neighbours
@@ -40,14 +40,20 @@ eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::Matri
     VectorXf point_i;
     int nthreads, tid;
     // Parallelise this for loop using OpenMP
-    #pragma omp parallel private(point_i)
+    #pragma omp parallel private(point_i) num_threads(n_cores)
     {
+        //omp_set_dynamic(0); //ensure max n_threads used
+        //omp_set_num_threads(n_cores);   //set number of threads
         /* Obtain thread number */
         tid = omp_get_thread_num();
         nthreads = omp_get_num_threads();
+    #pragma omp single
+    {
+        cout << "Operating on " << nthreads << " separate threads" << endl;
+    }
         int min_index;
 
-    #pragma omp for
+    #pragma omp for 
     for (int i=0;i< pointset1.rows(); i++){
             point_i = pointset1.row(i);
 
@@ -132,7 +138,7 @@ eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
     VectorXf T = get_T_vector(X, ps, p1s);
 
     // Final Steps (ii): Print Sum of Squared Difference
-    cout << "Sum of Squared Difference: " << get_SSD(ps, p1s, X, T) << endl;
+    //cout << "Sum of Squared Difference: " << get_SSD(ps, p1s, X, T) << endl;
 
     // Final Steps (iii): Append Translation Vector as final column and expand to return 4x4 matrix
     X.conservativeResize(X.rows(),X.cols()+1);
@@ -197,7 +203,7 @@ eig::MatrixXf read_matrix_new(string filepath)
 //   F U N C T I O N    T O    P E R F O R M     S U R F A C E   B A S E D   R E G I S T R A T I O N
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'} 
+eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s, bool openMP, int n_cores) // ps = {Pi}, p1s = {Pi'} 
 {
     using namespace eig;
 
@@ -216,20 +222,18 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
     while (counter < 10){
         // Declare empty matrix to store nearest neighbour pointset
         MatrixXf Neighbours(0,3);
-        cout << "Loop " << counter << endl;
+        //cout << "Loop " << counter << endl;
 
         // Transform the moving data. (Inital loop uses the identity transform).
         MatrixXf transformed_ps = (Transform * ps.transpose()).transpose();
 
         // Get set of Nearest Neighbours from this transformed data
-        auto start_s = std::chrono::high_resolution_clock::now();
+        if (openMP == true){
+            Neighbours = OPEN_MP_get_Nearest_Neighbours(p1s, transformed_ps, n_cores);
+        }
+        else{
             Neighbours = get_Nearest_Neighbours(p1s, transformed_ps); 
-        auto stop_s = std::chrono::high_resolution_clock::now();
-        cout << "Serial execution took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_s-start_s).count() << "ms" << endl;
-        start_s = std::chrono::high_resolution_clock::now();
-            Neighbours = OPEN_MP_get_Nearest_Neighbours(p1s, transformed_ps);
-        stop_s = std::chrono::high_resolution_clock::now();
-        cout << "Serial execution took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_s-start_s).count() << "ms" << endl;
+        }
 
         // With Nearest Neighbours pointset, we perform PBReg to get new Transformation
         Transform = SVD(Neighbours, p1s).topLeftCorner(3,3);
@@ -244,16 +248,41 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
             counter +=1;
         }
         else{
-            cout << "Sum of Squared Difference Increased; exiting loop" << endl;
-            cout << endl << "Transformation matrix: " << endl;
+            //cout << "Sum of Squared Difference Increased; exiting loop" << endl;
+            //cout << endl << "Transformation matrix: " << endl;
             return Transform;
         }
         
     }
-    cout << endl << "Transformation matrix: " << endl;
+    //cout << endl << "Transformation matrix: " << endl;
     return Transform;
 }
 
+
+
+// Timing Function
+void compare_times(eig::MatrixXf moving, eig::MatrixXf fixed, int n_iters)
+{
+    // Time Serial Execution
+    auto start_s = std::chrono::high_resolution_clock::now();
+    for (int iter=0; iter<n_iters; iter++){
+        ICP(moving, fixed, false, 0);
+        }
+    auto stop_s = std::chrono::high_resolution_clock::now();
+    cout << "Mean runtime over 5 iterations; Serial execution took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_s-start_s).count()/5 << "ms" << endl;
+
+    // Time parallel execution
+    for (int n_cores=1; n_cores <= 4; n_cores++){
+        start_s = std::chrono::high_resolution_clock::now();
+            for (int iter=0; iter<n_iters; iter++){
+            ICP(moving, fixed, true, n_cores);
+            }
+        stop_s = std::chrono::high_resolution_clock::now();
+        cout << "Mean runtime over 5 iterations; Parallel execution with " << n_cores << " threads took: " 
+        << std::chrono::duration_cast<std::chrono::milliseconds>(stop_s-start_s).count()/5 << "ms" << endl;
+        }
+
+}
 
 int main(int ac, char* av[])
 {
@@ -269,7 +298,6 @@ int main(int ac, char* av[])
 
     //cout << endl << "Fixed:" << endl << fixed.topLeftCorner(3,3) << endl;
     //cout << endl << "Moving:" << endl << moving.topLeftCorner(3,3) << endl;
-    
-    cout << endl << ICP(moving, fixed).topLeftCorner(3,3) << endl;
+    compare_times(moving, fixed, 5);
     return 0;
 }
