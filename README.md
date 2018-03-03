@@ -20,7 +20,7 @@
 
 ### Using OpemMP
 
-`/usr/local/opt/llvm/bin/clang++ -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11`
+`/usr/local/opt/llvm/bin/clang++ -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp`
 clang5 -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11
 
 * Note included homebrew's llvm 5.0
@@ -29,3 +29,6 @@ clang5 -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11
 
 ### TEMP
 clang5 -o build/test src/test_openmp.cc -lboost_program_options  -std=c++11
+
+
+clang5 -o build/test src/test_openmp.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib

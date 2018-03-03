@@ -2,6 +2,9 @@
 #include <fstream>
 #include <eigen3/Eigen/Dense>
 #include <vector>
+#include <omp.h>
+#include <ctime>
+
 
 using namespace std;
 namespace eig = Eigen;
@@ -34,13 +37,18 @@ eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::Matri
     using namespace eig;
     // Define new empty matrix to store Nearest Neighbours
     MatrixXf Neighbours(0,3);
-    
+    VectorXf point_i;
+    int nthreads, tid;
     // Parallelise this for loop using OpenMP
-    #pragma omp parallel private(x), firstprivate(sum), shared(pi)
+    #pragma omp parallel private(point_i)
     {
+        /* Obtain thread number */
+        tid = omp_get_thread_num();
+        printf("Hello World from thread = %d\n", tid);
+
     #pragma omp for
     for (int i=0;i< pointset1.rows(); i++){
-            VectorXf point_i = pointset1.row(i);
+            point_i = pointset1.row(i);
 
              // Find Nearest Neighbour for each fixed point (pi with the minimum Euclidean distance)
                 MatrixXf diff_mat = (pointset2.rowwise() - point_i.transpose()); // Vector distance between pi1 and each point in the transformed pointset
@@ -52,8 +60,8 @@ eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::Matri
                 Neighbours.conservativeResize(Neighbours.rows()+1, Neighbours.cols());
                 Neighbours.row(Neighbours.rows()-1) = pointset2.row(min_index);
             }
+    } // End OpenMP Parallel region
     return Neighbours;
-    }
 }
 
 
@@ -214,7 +222,14 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
         MatrixXf transformed_ps = (Transform * ps.transpose()).transpose();
 
         // Get set of Nearest Neighbours from this transformed data
-        Neighbours = get_Nearest_Neighbours(p1s, transformed_ps); // args(Fixed, Moving)
+        auto start_s = std::chrono::high_resolution_clock::now();
+            Neighbours = get_Nearest_Neighbours(p1s, transformed_ps); 
+        auto stop_s = std::chrono::high_resolution_clock::now();
+        cout << "Serial execution took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_s-start_s).count() << "ms" << endl;
+        start_s = std::chrono::high_resolution_clock::now();
+            Neighbours = OPEN_MP_get_Nearest_Neighbours(p1s, transformed_ps);
+        stop_s = std::chrono::high_resolution_clock::now();
+        cout << "Serial execution took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_s-start_s).count() << "ms" << endl;
 
         // With Nearest Neighbours pointset, we perform PBReg to get new Transformation
         Transform = SVD(Neighbours, p1s).topLeftCorner(3,3);
@@ -250,10 +265,10 @@ int main(int ac, char* av[])
 
     eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
     eig::MatrixXf moving = read_matrix_new(moving_filepath);
-    cout << "Data imported." << endl;
+    //cout << "Data imported." << endl;
 
-    cout << endl << "Fixed:" << endl << fixed.topLeftCorner(3,3) << endl;
-    cout << endl << "Moving:" << endl << moving.topLeftCorner(3,3) << endl;
+    //cout << endl << "Fixed:" << endl << fixed.topLeftCorner(3,3) << endl;
+    //cout << endl << "Moving:" << endl << moving.topLeftCorner(3,3) << endl;
     
     cout << endl << ICP(moving, fixed).topLeftCorner(3,3) << endl;
     return 0;
