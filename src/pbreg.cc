@@ -2,10 +2,9 @@
 #include <fstream>
 #include <tuple>
 #include <string>
-#include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
-#include <boost/lexical_cast.hpp>
 #include <eigen3/Eigen/Dense>
+#include <omp.h>
 
 #include "../headers/exceptions.h"
 
@@ -183,14 +182,14 @@ eig::MatrixXf SVD(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //   F U N C T I O N    T O    P E R F O R M     S B   R E G 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'} 
+eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf fixed_ps) // ps = {Pi}, p1s = {Pi'} 
 {
     using namespace eig;
 
     // Step 1: Initialise the current transformation to the identity transform 
     MatrixXf Transform(3,3);
     Transform = MatrixXf::Identity(3,3);
-    MatrixXf transformed_ps (0,3);
+    //MatrixXf transformed_ps (0,3);
 
     // Step 2: Initialise the current SSD to some maximum value. 
     float SSD = 10e6;
@@ -208,20 +207,22 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s) // ps = {Pi}, p1s = {Pi'}
         MatrixXf transformed_ps = (Transform * ps.transpose()).transpose();
 
         // Get set of Nearest Neighbours from this transformed data
-        Neighbours = get_Nearest_Neighbours(p1s, transformed_ps); // args(Fixed, Moving)
+        Neighbours = get_Nearest_Neighbours(fixed_ps, transformed_ps); 
 
         // With Nearest Neighbours pointset, we perform PBReg to get new Transformation
-        Transform = SVD(Neighbours, p1s).topLeftCorner(3,3);
+        Transform = SVD(Neighbours, fixed_ps).topLeftCorner(3,3);
 
         // First calculate the Translation Vector T
-        VectorXf T = get_T_vector(Transform, Neighbours, p1s);  
+        VectorXf T = get_T_vector(Transform, Neighbours, fixed_ps);  
 
         // Then use this to compute the SSD of this transformation
-        float new_SSD = get_SSD(Neighbours, p1s, Transform, T);
-        if (get_SSD(Neighbours, p1s, Transform, T) <= SSD){
+        float new_SSD = get_SSD(Neighbours, fixed_ps, Transform, T);
+
+        if (get_SSD(Neighbours, fixed_ps, Transform, T) <= SSD){
             SSD = new_SSD;
             counter +=1;
         }
+
         else{
             //cout << "Sum of Squared Difference Increased; exiting loop" << endl;
             //cout << endl << "Transformation matrix: " << endl;
