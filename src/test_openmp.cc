@@ -36,7 +36,7 @@ eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::Matri
 {
     using namespace eig;
     // Define new empty matrix to store Nearest Neighbours
-    MatrixXf Neighbours(0,3);
+    MatrixXf Neighbours(pointset1.rows(),3);
     VectorXf point_i;
     int nthreads, tid;
     // Parallelise this for loop using OpenMP
@@ -44,21 +44,21 @@ eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::Matri
     {
         /* Obtain thread number */
         tid = omp_get_thread_num();
-        printf("Hello World from thread = %d\n", tid);
+        nthreads = omp_get_num_threads();
+        int min_index;
 
     #pragma omp for
     for (int i=0;i< pointset1.rows(); i++){
             point_i = pointset1.row(i);
 
-             // Find Nearest Neighbour for each fixed point (pi with the minimum Euclidean distance)
-                MatrixXf diff_mat = (pointset2.rowwise() - point_i.transpose()); // Vector distance between pi1 and each point in the transformed pointset
-                VectorXf diff = diff_mat.rowwise().squaredNorm();    // Euclidean distance between pi1 and each point in the transformed pointset
-           
-                int min_index;
-                float min = diff.minCoeff(&min_index);  
-                // Add Nearest Neighbour to new pointset
-                Neighbours.conservativeResize(Neighbours.rows()+1, Neighbours.cols());
-                Neighbours.row(Neighbours.rows()-1) = pointset2.row(min_index);
+             // Get Vector distance between pi1 and each point in the transformed pointset
+            MatrixXf diff_mat = (pointset2.rowwise() - point_i.transpose()); 
+            // Take Norm to find Euclidean distance between pi1 and each point in the transformed pointset
+            VectorXf diff = diff_mat.rowwise().squaredNorm();    
+            // Find index of minimum distance point
+            float min = diff.minCoeff(&min_index);  
+            // Add nearest neigbour to new pointset
+            Neighbours.row(i) = pointset2.row(min_index);
             }
     } // End OpenMP Parallel region
     return Neighbours;
