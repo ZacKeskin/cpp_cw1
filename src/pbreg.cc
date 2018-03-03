@@ -98,7 +98,7 @@ float get_SSD(eig::MatrixXf ps, eig::MatrixXf p1s, Eigen::MatrixXf R, Eigen::Vec
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//   F U N C T I O N    T O    G E T    N E A R E S T    N E I G H B O U R S    B E T W E E N    P O I N T S E T S
+//   F U N C T I O N S   T O    G E T    N E A R E S T    N E I G H B O U R S    B E T W E E N    P O I N T S E T S
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 eig::MatrixXf get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf pointset2)
 {
@@ -119,6 +119,37 @@ eig::MatrixXf get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf poin
                 Neighbours.conservativeResize(Neighbours.rows()+1, Neighbours.cols());
                 Neighbours.row(Neighbours.rows()-1) = pointset2.row(min_index);
             }
+    return Neighbours;
+}
+eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf pointset2)
+{
+    using namespace eig;
+    // Define new empty matrix to store Nearest Neighbours
+    MatrixXf Neighbours(pointset1.rows(),3);
+    VectorXf point_i;
+    int nthreads, tid;
+    // Parallelise this for loop using OpenMP
+    #pragma omp parallel private(point_i)
+    {
+        /* Obtain thread number */
+        tid = omp_get_thread_num();
+        nthreads = omp_get_num_threads();
+        int min_index;
+
+    #pragma omp for
+    for (int i=0;i< pointset1.rows(); i++){
+            point_i = pointset1.row(i);
+
+             // Get Vector distance between pi1 and each point in the transformed pointset
+            MatrixXf diff_mat = (pointset2.rowwise() - point_i.transpose()); 
+            // Take Norm to find Euclidean distance between pi1 and each point in the transformed pointset
+            VectorXf diff = diff_mat.rowwise().squaredNorm();    
+            // Find index of minimum distance point
+            float min = diff.minCoeff(&min_index);  
+            // Add nearest neigbour to new pointset
+            Neighbours.row(i) = pointset2.row(min_index);
+            }
+    } // End OpenMP Parallel region
     return Neighbours;
 }
 
@@ -232,6 +263,21 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf fixed_ps) // ps = {Pi}, p1s = 
         }
         
     }
+    // Final Steps (i): Calculate Translation vector 
+    VectorXf T = get_T_vector(Transform, ps, fixed_ps);
+
+    // Final Steps (ii): Print Sum of Squared Difference
+    //cout << "Sum of Squared Difference: " << get_SSD(ps, fixed_ps, Transform, T) << endl;
+
+    // Final Steps (iii): Append Translation Vector as final column and expand to return 4x4 matrix
+    Transform.conservativeResize(Transform.rows(),Transform.cols()+1);
+    Transform.col(Transform.cols()-1) = T;
+
+    RowVectorXf bottom_row(1,4);
+    bottom_row << 0, 0, 0, 1;
+    Transform.conservativeResize(Transform.rows()+1,Transform.cols());
+    Transform.row(Transform.rows()-1) = bottom_row;
+
     cout << endl << "Transformation matrix: " << endl;
     return Transform;
 }
@@ -319,6 +365,8 @@ int main(int ac, char* av[])
         cout << "Performing Point-Based Registration" << endl;
         cout << SVD(moving, fixed) << endl;
     }
+
+    
 
     return 0;
 
