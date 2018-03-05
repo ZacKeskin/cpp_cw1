@@ -10,40 +10,38 @@ using namespace std;
 namespace eig = Eigen;
 
 // Calculate Nearest Neighbours between pointsets
-eig::MatrixXf get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf pointset2)
+eig::MatrixXf get_Nearest_Neighbours(eig::MatrixXf original_fixed, eig::MatrixXf original_moving, eig::MatrixXf transformed_moving)
 {
     using namespace eig;
     // Define new empty matrix to store Nearest Neighbours
     MatrixXf Neighbours(0,3);
     
-    for (int i=0;i< pointset1.rows(); i++){
-            VectorXf point_i = pointset1.row(i);
+    for (int i=0;i< original_fixed.rows(); i++){
+            VectorXf point_i = original_fixed.row(i);
 
              // Find Nearest Neighbour for each fixed point (pi with the minimum Euclidean distance)
-                MatrixXf diff_mat = (pointset2.rowwise() - point_i.transpose()); // Vector distance between pi1 and each point in the transformed pointset
+                MatrixXf diff_mat = (transformed_moving.rowwise() - point_i.transpose()); // Vector distance between pi1 and each point in the transformed pointset
                 VectorXf diff = diff_mat.rowwise().squaredNorm();    // Euclidean distance between pi1 and each point in the transformed pointset
            
                 int min_index;
                 float min = diff.minCoeff(&min_index);  
                 // Add Nearest Neighbour to new pointset
                 Neighbours.conservativeResize(Neighbours.rows()+1, Neighbours.cols());
-                Neighbours.row(Neighbours.rows()-1) = pointset2.row(min_index);
+                Neighbours.row(Neighbours.rows()-1) = original_moving.row(min_index);
             }
     return Neighbours;
 }
 
-eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::MatrixXf pointset2, int n_cores)
+eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf original_fixed, eig::MatrixXf original_moving, eig::MatrixXf transformed_moving, int n_cores)
 {
     using namespace eig;
     // Define new empty matrix to store Nearest Neighbours
-    MatrixXf Neighbours(pointset1.rows(),3);
+    MatrixXf Neighbours(original_fixed.rows(),3);
     VectorXf point_i;
     int nthreads, tid;
     // Parallelise this for loop using OpenMP
     #pragma omp parallel private(point_i) num_threads(n_cores)
     {
-        //omp_set_dynamic(0); //ensure max n_threads used
-        //omp_set_num_threads(n_cores);   //set number of threads
         /* Obtain thread number */
         tid = omp_get_thread_num();
         nthreads = omp_get_num_threads();
@@ -53,18 +51,18 @@ eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf pointset1, eig::Matri
     }
         int min_index;
 
-    #pragma omp for 
-    for (int i=0;i< pointset1.rows(); i++){
-            point_i = pointset1.row(i);
+    #pragma omp for schedule(dynamic)
+    for (int i=0;i< original_fixed.rows(); i++){
+            point_i = original_fixed.row(i);
 
              // Get Vector distance between pi1 and each point in the transformed pointset
-            MatrixXf diff_mat = (pointset2.rowwise() - point_i.transpose()); 
+            MatrixXf diff_mat = (transformed_moving.rowwise() - point_i.transpose()); 
             // Take Norm to find Euclidean distance between pi1 and each point in the transformed pointset
             VectorXf diff = diff_mat.rowwise().squaredNorm();    
             // Find index of minimum distance point
             float min = diff.minCoeff(&min_index);  
             // Add nearest neigbour to new pointset
-            Neighbours.row(i) = pointset2.row(min_index);
+            Neighbours.row(i) = original_moving.row(min_index);
             }
     } // End OpenMP Parallel region
     return Neighbours;
@@ -93,7 +91,6 @@ float get_SSD(eig::MatrixXf ps, eig::MatrixXf p1s, Eigen::MatrixXf R, Eigen::Vec
           float SD = (p1s.row(i).transpose() - (R * ps.row(i).transpose() + T)).squaredNorm() ;
           sum_SD += SD;
         }    
-    
     
     return sum_SD;
 }
@@ -203,14 +200,15 @@ eig::MatrixXf read_matrix_new(string filepath)
 //   F U N C T I O N    T O    P E R F O R M     S U R F A C E   B A S E D   R E G I S T R A T I O N
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s, bool openMP, int n_cores) // ps = {Pi}, p1s = {Pi'} 
+eig::MatrixXf ICP(eig::MatrixXf moving_ps, eig::MatrixXf fixed_ps, bool openMP, int n_cores) 
 {
     using namespace eig;
-
+    
     // Step 1: Initialise the current transformation to the identity transform 
     MatrixXf Transform(3,3);
+    VectorXf Translate(3);
     Transform = MatrixXf::Identity(3,3);
-    MatrixXf transformed_ps (0,3);
+    Translate = VectorXf::Zero(3);
 
     // Step 2: Initialise the current SSD to some maximum value. 
     float SSD = 10e6;
@@ -219,42 +217,62 @@ eig::MatrixXf ICP(eig::MatrixXf ps, eig::MatrixXf p1s, bool openMP, int n_cores)
     int counter = 0;
     
     
-    while (counter < 10){
+    while (counter < 30){
         // Declare empty matrix to store nearest neighbour pointset
         MatrixXf Neighbours(0,3);
-        //cout << "Loop " << counter << endl;
-
+        cout << "Loop " << counter << endl;
+        
         // Transform the moving data. (Inital loop uses the identity transform).
-        MatrixXf transformed_ps = (Transform * ps.transpose()).transpose();
+        MatrixXf transformed_ps = (Transform * moving_ps.transpose()).transpose();
+        transformed_ps = (transformed_ps.transpose().colwise() + Translate).transpose();
 
         // Get set of Nearest Neighbours from this transformed data
         if (openMP == true){
-            Neighbours = OPEN_MP_get_Nearest_Neighbours(p1s, transformed_ps, n_cores);
+            Neighbours = OPEN_MP_get_Nearest_Neighbours(fixed_ps, moving_ps, transformed_ps, n_cores);
         }
         else{
-            Neighbours = get_Nearest_Neighbours(p1s, transformed_ps); 
+            Neighbours = get_Nearest_Neighbours(fixed_ps, moving_ps, transformed_ps); 
         }
 
         // With Nearest Neighbours pointset, we perform PBReg to get new Transformation
-        Transform = SVD(Neighbours, p1s).topLeftCorner(3,3);
+        MatrixXf M = SVD(Neighbours, fixed_ps);
+        Transform = M.topLeftCorner(3,3);
+        Translate = M.topRightCorner(3,1);
 
         // First calculate the Translation Vector T
-        VectorXf T = get_T_vector(Transform, Neighbours, p1s);  
-        
+        VectorXf T = get_T_vector(Transform, Neighbours, fixed_ps);  
+
         // Then use this to compute the SSD of this transformation
-        float new_SSD = get_SSD(Neighbours, p1s, Transform, T);
-        if (get_SSD(Neighbours, p1s, Transform, T) <= SSD){
+        float new_SSD = get_SSD(Neighbours, fixed_ps, Transform, T);
+        cout << "Sum of Squared Difference: " << new_SSD << endl;
+        /* Note: we currently run to the max loopcount, unless SSD < 10^-6.
+           This is because we find the algorithm ends too soon, which prevents 
+           convergence to the transformation matrix  */
+        if (new_SSD >10e-6){ 
             SSD = new_SSD;
             counter +=1;
         }
         else{
             //cout << "Sum of Squared Difference Increased; exiting loop" << endl;
             //cout << endl << "Transformation matrix: " << endl;
-            return Transform;
+            break;
+            //SSD = new_SSD;
+            //counter +=1;
         }
         
     }
-    //cout << endl << "Transformation matrix: " << endl;
+    // Final Steps (i): Calculate Translation vector 
+    VectorXf T = get_T_vector(Transform, moving_ps, fixed_ps);
+
+    // Final Steps (ii): Append Translation Vector as final column and expand to return 4x4 matrix
+    Transform.conservativeResize(Transform.rows(),Transform.cols()+1);
+    Transform.col(Transform.cols()-1) = T;
+
+    RowVectorXf bottom_row(1,4);
+    bottom_row << 0, 0, 0, 1;
+    Transform.conservativeResize(Transform.rows()+1,Transform.cols());
+    Transform.row(Transform.rows()-1) = bottom_row;
+
     return Transform;
 }
 
@@ -275,7 +293,7 @@ void compare_times(eig::MatrixXf moving, eig::MatrixXf fixed, int n_iters)
     for (int n_cores=1; n_cores <= 4; n_cores++){
         start_s = std::chrono::high_resolution_clock::now();
             for (int iter=0; iter<n_iters; iter++){
-            ICP(moving, fixed, true, n_cores);
+            cout << ICP(moving, fixed, true, n_cores) << endl;
             }
         stop_s = std::chrono::high_resolution_clock::now();
         cout << "Mean runtime over 5 iterations; Parallel execution with " << n_cores << " threads took: " 
@@ -287,10 +305,10 @@ void compare_times(eig::MatrixXf moving, eig::MatrixXf fixed, int n_iters)
 int main(int ac, char* av[])
 {
 
-    string fixed_filepath = "data/fran_cut.txt";
-    string moving_filepath = "data/fran_cut_transformed.txt";
-    //string fixed_filepath = "data/fixed.txt";
-    //string moving_filepath = "data/moving.txt";
+    //string fixed_filepath = "data/fran_cut_transformed.txt";
+    //string moving_filepath = "data/fran_cut.txt";
+    string fixed_filepath = "data/fixed.txt";
+    string moving_filepath = "data/moving.txt";
 
     eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
     eig::MatrixXf moving = read_matrix_new(moving_filepath);
