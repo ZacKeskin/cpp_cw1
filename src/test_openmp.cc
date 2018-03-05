@@ -51,7 +51,7 @@ eig::MatrixXf OPEN_MP_get_Nearest_Neighbours(eig::MatrixXf original_fixed, eig::
     }
         int min_index;
 
-    #pragma omp for schedule(dynamic)
+    #pragma omp for 
     for (int i=0;i< original_fixed.rows(); i++){
             point_i = original_fixed.row(i);
 
@@ -281,6 +281,7 @@ eig::MatrixXf ICP(eig::MatrixXf moving_ps, eig::MatrixXf fixed_ps, bool openMP, 
 // Timing Function
 void compare_times(eig::MatrixXf moving, eig::MatrixXf fixed, int n_iters)
 {
+     //---Commenting out to perform tests using different OpenMP Schedules
     // Time Serial Execution
     auto start_s = std::chrono::high_resolution_clock::now();
     for (int iter=0; iter<n_iters; iter++){
@@ -288,7 +289,7 @@ void compare_times(eig::MatrixXf moving, eig::MatrixXf fixed, int n_iters)
         }
     auto stop_s = std::chrono::high_resolution_clock::now();
     cout << "Mean runtime over 5 iterations; Serial execution took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_s-start_s).count()/5 << "ms" << endl;
-
+    
     // Time parallel execution
     for (int n_cores=1; n_cores <= 4; n_cores++){
         start_s = std::chrono::high_resolution_clock::now();
@@ -304,18 +305,12 @@ void compare_times(eig::MatrixXf moving, eig::MatrixXf fixed, int n_iters)
 
 int main(int ac, char* av[])
 {
-
-    //string fixed_filepath = "data/fran_cut_transformed.txt";
-    //string moving_filepath = "data/fran_cut.txt";
-    string fixed_filepath = "data/fixed.txt";
-    string moving_filepath = "data/moving.txt";
+    string fixed_filepath = "data/fran_cut_transformed.txt";
+    string moving_filepath = "data/fran_cut.txt";
 
     eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
     eig::MatrixXf moving = read_matrix_new(moving_filepath);
-    //cout << "Data imported." << endl;
 
-    //cout << endl << "Fixed:" << endl << fixed.topLeftCorner(3,3) << endl;
-    //cout << endl << "Moving:" << endl << moving.topLeftCorner(3,3) << endl;
     compare_times(moving, fixed, 5);
     return 0;
 }

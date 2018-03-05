@@ -1,8 +1,14 @@
 
 ### Compile using:
 
-` g++ -o build/pb src/pbreg.cc -lboost_program_options -std=c++11`
+`/usr/local/opt/llvm/bin/clang++ -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp`
 
+`clang5 -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
+
+`clang5 -o build/test src/test_openmp.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
+
+* Note included homebrew's llvm 5.0
+* Will alias this in terminal as `clang5`
 
 
 ### Run Point-Based or Surface-Based Registration with:
@@ -16,35 +22,28 @@
 
 
 
-### Using OpemMP
-
-`/usr/local/opt/llvm/bin/clang++ -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp`
-clang5 -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib
-
-clang5 -o build/test src/test_openmp.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib
-
-* Note included homebrew's llvm 5.0
-* Will alias this in terminal as `clang5`
-
 
 ## Code timings (Question 14)
 
-Q14: Serial=12,356ms Parallel=12,595ms Cores=1
-Q14: Serial=12,356ms Parallel=6136ms Cores=2
-Q14: Serial=12,356ms Parallel=5675ms Cores=3
-Q14: Serial=12,356ms Parallel=5721ms Cores=4
+### Run the executable to calculate compute times using different cores.
+`build/./codetimer`
+- This will calculate the code executed first without OpenMP, then using 1-4 cores.
+- The mean time taken across 5 iterations is recorded in each case.
 
-We see that doubling the cores from 1 to 2 roughly halves the overall time taken to perform the algorithm. However, this relationship does not seem to scale when extending to more than two cores (in fact 4 cores was measured as being slightly slower than 3.)
+### You can optionally build the code-timing executable simply using 
+`clang5 -o build/codetimer src/test_openmp.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
 
-- **Note:** Serial uses 1 core (no OpenMP) so the figure was calculated once and shared on all lines below
 
-Mean runtime over 5 iterations; Serial execution took: 85744ms
-Mean runtime over 5 iterations; Parallel execution with 1 threads took: 83085ms
-Mean runtime over 5 iterations; Parallel execution with 2 threads took: 66167ms
-Mean runtime over 5 iterations; Parallel execution with 3 threads took: 42170ms
-Mean runtime over 5 iterations; Parallel execution with 4 threads took: 38891ms
+Q14: Serial=83,250ms, Parallel=78,307, Cores=1
+Q14: Serial=n/a, Parallel=38,463ms, Cores=2
+Q14: Serial=n/a, Parallel=39,688ms, Cores=3
+Q14: Serial=n/a, Parallel=38,210ms, Cores=4
 
-## OpenMP Parallelisation Schemes:
+- We note that the inital decrease from parallelising is significant; doubling the cores from 1 to 2 almost halves execution time. However, this trend is not maintained when increasing the cores to 3 or 4. We see little benefit parallelising beyond two separate threads.
+- It is likely that the Nearest-Neighbour function, once parallelised, takes a small portion of the overall execution time. The rest of the code is strictly serial which, by Amdahl's law, may explain why there is limited speed-up below ~40s.
+
+
+## OpenMP Parallelisation Schedules (Question 15):
 ### OpenMP can distribute operations across threads in different ways. The inbuilt schemes are described below (from https://computing.llnl.gov/tutorials/openMP/)
 
 * STATIC    
@@ -58,4 +57,23 @@ Mean runtime over 5 iterations; Parallel execution with 4 threads took: 38891ms
 * AUTO
     - The scheduling decision is delegated to the compiler and/or runtime system.
 
-### Since we cannot pass these as variables to the pre-processor, the comparisons were performed manually by changing the 
+### Since we cannot pass these as variables to the pre-processor, the comparisons were performed manually by changing the OpenMP Preprocessor directive to include the schedule each time.
+
+Q15: Strategy=static, Serial=n/a, Parallel=37,379ms, Cores=2
+Q15: Strategy=static, Serial=n/a, Parallel=36,404ms, Cores=3
+Q15: Strategy=static, Serial=n/a, Parallel=35,287ms, Cores=4
+
+Q15: Strategy=guided, Serial=n/a, Parallel=36,403ms, Cores=2
+Q15: Strategy=guided, Serial=n/a, Parallel=40,926ms, Cores=3
+Q15: Strategy=guided, Serial=n/a, Parallel=37,520ms, Cores=4
+
+Q15: Strategy=dynamic, Serial=n/a, Parallel=39,956ms, Cores=2
+Q15: Strategy=dynamic, Serial=n/a, Parallel=36,430ms, Cores=3
+Q15: Strategy=dynamic, Serial=n/a, Parallel=37,385ms, Cores=4
+
+Q15: Strategy=runtime, Serial=n/a, Parallel=45,317ms, Cores=2
+Q15: Strategy=runtime, Serial=n/a, Parallel=40,464ms, Cores=3
+Q15: Strategy=runtime, Serial=n/a, Parallel=37,037ms, Cores=4
+
+- The notable effect across all schemes is a large speedup for 2 cores, and a smaller but still significant speedup using 3 cores. By the time all four cores are used, the marginal gains 
+- Interestingly, we see little difference between the different strategies. Static appears to offer the most reliable improvement in times irrespective of the number of cores. Runtime has the largest difference between 2 and 4 cores, although under 4 cores it is in line with the other strategies; so this is the least useful schedule in this case.
