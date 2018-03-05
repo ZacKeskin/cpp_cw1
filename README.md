@@ -1,14 +1,9 @@
 
 ### Compile using:
 
-`/usr/local/opt/llvm/bin/clang++ -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp`
-
-`clang5 -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
-
-`clang5 -o build/test src/test_openmp.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
+`/usr/local/opt/llvm/bin/clang++ -o build/pb src/pbreg.cc -lboost_program_options  -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
 
 * Note included homebrew's llvm 5.0
-* Will alias this in terminal as `clang5`
 
 
 ### Run Point-Based or Surface-Based Registration with:
@@ -77,3 +72,14 @@ Q15: Strategy=runtime, Serial=n/a, Parallel=37,037ms, Cores=4
 
 - The notable effect across all schemes is a large speedup for 2 cores, and a smaller but still significant speedup using 3 cores. By the time all four cores are used, the marginal gains 
 - Interestingly, we see little difference between the different strategies. Static appears to offer the most reliable improvement in times irrespective of the number of cores. Runtime has the largest difference between 2 and 4 cores, although under 4 cores it is in line with the other strategies; so this is the least useful schedule in this case.
+
+
+## Unit tests (Questions 16 & 17):
+- Unit tests using the Catch2 header-only testing library have been included
+    - These compare the output of the PBReg and SBReg functions against provided transformation matrices
+    - We use fixed.txt, moving.txt and Matrix.4x4, which are all provided in the /data directory
+
+- Run the tests using `build/./unittests`
+
+- If required this can be compiled from source using:
+`/usr/local/opt/llvm/bin/clang++ -o build/unittests tests/unit_tests.cc -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
