@@ -7,10 +7,7 @@
 #include <omp.h>
 
 #include "../headers/exceptions.h"
-
-using std::cout;
-using std::cout;
-using std::endl;
+using namespace std;
 namespace po = boost::program_options; // Define namespace for using program_options
 namespace eig = Eigen; 
 
@@ -322,12 +319,12 @@ std::tuple <string, string, string, string> get_options(int ac, char* av[])
             if (vm.count("output")==1) {
                 output_path = vm["output"].as<string>();
             }
+            else{output_path = "output/Transformation_Matrix.4x4";}
 
             // Read Command-Line options to choose between PBReg or SBReg
             if (vm.count("regtype")==1) {
                 reg_type = vm["regtype"].as<string>();
             }
-            //else{output_path = "/output/matrix.4x4";}
             //else{throw "user must provide --output option";}
             
             cout << "The matrix will be saved to:  {current directory}/" << output_path << endl;
@@ -355,19 +352,28 @@ int main(int ac, char* av[])
     // Read in data for fixed and moving point sets 
     eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
     eig::MatrixXf moving = read_matrix_new(moving_filepath);
+    eig::MatrixXf output;
 
     if(reg_type=="sbreg"){
         // Employ ICP method to calculate output matrix
         cout << "Performing Surface-Based Registration" << endl;
-        cout << ICP(moving, fixed) << endl;
+        output = ICP(moving, fixed);
+        cout << output << endl;
     }
     else{
         // Employ Arun's SVD method to calculate output matrix
         cout << "Performing Point-Based Registration" << endl;
-        cout << SVD(moving, fixed) << endl;
+        output = SVD(moving, fixed);
+        cout << output << endl;
     }
 
-    
+    // Output matrix to file
+    std::ofstream output_file(output_path);
+    if (output_file.is_open())
+    {
+        output_file << output;
+    }
+    else{cout << "why not" << endl;}
 
     return 0;
 
