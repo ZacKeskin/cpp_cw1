@@ -3,20 +3,24 @@
 The codebase has been structured so that key functions required in unit tests, timing and the point&surface based registration are stored in one place and made available to each. This requires compiling each .cc file individually to create the objects. These are then linked as necessary with the functions object. Once done, the build folder contains:
 -  The point & surface-based registration program
 -  A unit-test binary program
--  A separate program which was used to perform timing tests on the code
+-  (Optional) A separate program which was used to perform timing tests on the code
 ## OSX 
-gcc/g++ on OSX are sym-linked to invoke Clang. However the Clang version installed is not able to use OpenMP. Therefore, you must install a newer version from homebrew:
 
-`brew install llvm`
-
-Note the installation location. If using the default location, you will find Clang++ in  **/usr/local/opt/llvm/bin/**.
-
-If you don't already have Boost installed, you can install this from homebrew using:
+Required libraries are Boost and Eigen. If you don't already have Boost installed, you can install this from homebrew using:
 
 `brew install boost`
 
+Eigen is header-only and provided in this repository, so this should be found by the compiler. If not, you can copy the eigen3 folder into any of the libraries searched by your compiler e.g. '/usr/local/include'. 
+
+Unfortunately, on OSX gcc/g++ on OSX are sym-linked to invoke Clang - and the Clang version installed is not able to use OpenMP. Therefore, you must install a newer version from homebrew:
+
+`brew install llvm`
+
+Note the installation location. If using the default location, you will find Clang++ in  **/usr/local/opt/llvm/bin/**. You will need to prepend this location when invoking any of the `clang++` commands described below.
+
+
 Compile source code using:
-- `clang++ -c srs/functions.cc -std=c++11`
+- `clang++ -c src/functions.cc -std=c++11`
 - `clang++ -c src/pbreg.cc -std=c++11`
 - `clang++ -c tests/unit_tests.cc -std=c++11`
 
@@ -131,3 +135,11 @@ Q15: Strategy=runtime, Serial=n/a, Parallel=37,037ms, Cores=4
 `/usr/local/opt/llvm/bin/clang++ -o build/unittests tests/unit_tests.cc -std=c++11 -fopenmp -L/usr/local/Cellar/llvm/5.0.1/lib`
 
 - The functions from pbreg.cc have been copied directly into the unit_tests.cc file. This is because including the declarations in a header file meant each file needed to be compiled together, then linked. This required the compilation of all required libraries including boost program_options which was a considerable effort to achieve. Therefore copying the code was unfortunately a far more efficient approach.
+
+# Graphing performance (Question 18):
+
+graph.png shows the performance of the serial and parallel implementations of the surface-based registration function operating on increasingly large point sets.
+
+Whilst for small data sets, there is little difference (and indeed serial can be faster than parallel for N = c.50 or less), in larger data sets the function parallelised with OpenMP becomes significantly quicker than the naive implementation. 
+
+The relationship of execution time with N appears to be quadratic, although due to other processor tasks (e.g. OS background tasks etc.) there is some error. This is notable in the N=600 case (where in fact these times were taken after all the other measurements).
