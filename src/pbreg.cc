@@ -17,47 +17,61 @@ namespace eig = Eigen;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 eig::MatrixXf read_matrix_new(string filepath)
 {
-    // Create a filestream object (read only)
-    ifstream myfile;
-    // Use it to open our text file
-    myfile.open (filepath, ios::out); 
-    eig::MatrixXf point_matrix(0,3);
+    try
+    {
+        // Create a filestream object (read only)
+        ifstream myfile;
+        // Use it to open our text file
+        myfile.open (filepath, ios::out); 
+        eig::MatrixXf point_matrix(0,3);
 
-    // Check that the file was successfully opened
-    if (myfile.is_open()) 
-        {
-        string line;    
-        // Read all lines in the file
-        while ( getline (myfile,line) )
+        // Check that the file was successfully opened
+        if (myfile.is_open()) 
             {
-            // Split each line into an array using tab delimiter
-            std::string str = line;
+            string line;    
+            // Read all lines in the file
+            while ( getline (myfile,line) )
+                {
+                // Split each line into an array using tab delimiter
+                std::string str = line;
 
-            // Declare variables used to receive data from file
-            eig::Vector3f row_vector;
-            std::istringstream lineStream(line);
-            std::string cell;
+                // Declare variables used to receive data from file
+                eig::Vector3f row_vector;
+                std::istringstream lineStream(line);
+                std::string cell;
+                
+                int i = 0;
+                std::vector<float> point_vector(3);
+                // Iterate over the line (skipping whitespace with std::ws())
+                while (std::getline(std::ws(lineStream), cell, ' ')) {
+                    // Iterate through the points in the row. Put each triple into a coordinate vector:
+                    point_vector[i%3] = std::stof(cell);
+                    i++;
+                    if (i%3 ==0) {
+                        // Map this filled std::vector into an Eigen::vector
+                        eig::Map<eig::Vector3f> eig_vector(point_vector.data());
+                        // Append the Eigen::vector to the Eigen::matrix
+                        point_matrix.conservativeResize(point_matrix.rows()+1, point_matrix.cols());
+                        point_matrix.row(point_matrix.rows()-1) = eig_vector;
+                        // Create a new point-vector
+                        std::vector<float> point_vector(3);}
+                    }           
+                }   
             
-            int i = 0;
-            std::vector<float> point_vector(3);
-            // Iterate over the line (skipping whitespace with std::ws())
-            while (std::getline(std::ws(lineStream), cell, ' ')) {
-                // Iterate through the points in the row. Put each triple into a coordinate vector:
-                point_vector[i%3] = std::stof(cell);
-                i++;
-                if (i%3 ==0) {
-                    // Map this filled std::vector into an Eigen::vector
-                    eig::Map<eig::Vector3f> eig_vector(point_vector.data());
-                    // Append the Eigen::vector to the Eigen::matrix
-                    point_matrix.conservativeResize(point_matrix.rows()+1, point_matrix.cols());
-                    point_matrix.row(point_matrix.rows()-1) = eig_vector;
-                    // Create a new point-vector
-                    std::vector<float> point_vector(3);}
-                }           
-            }   
+            cout << endl;
+            return point_matrix;  
+            }
+        else{
+            throw(myexception("Required input file was not found; check you have entered the correct filepath"));
         }
-    cout << endl;
-    return point_matrix;
+    }
+    catch(exception& e) {
+    cout << "Error: " << e.what() << "\n";
+    exit(1);
+    }
+
+      
+  
 }
 
 
@@ -306,13 +320,14 @@ std::tuple <string, string, string, string> get_options(int ac, char* av[])
             // Read Command-Line options to get location of input data      
             if (vm.count("fixed")==1) {
                 fixed_filepath = vm["fixed"].as<string>();
-            }//else{throw myex;}
-            //else{throw "user must provide --fixed option";}
+            }
+            else{throw myexception("No filepath provided for --fixed option");}
+
 
             if (vm.count("moving")==1){
                 moving_filepath = vm["moving"].as<string>();
-            }//else{throw myex;}
-            //else{throw "user must provide --moving option";}
+            }
+            else{throw myexception("No filepath provided for --moving option");}
             
 
             // Read Command-Line options to get location for output data
@@ -325,14 +340,13 @@ std::tuple <string, string, string, string> get_options(int ac, char* av[])
             if (vm.count("regtype")==1) {
                 reg_type = vm["regtype"].as<string>();
             }
-            //else{throw "user must provide --output option";}
             
-            cout << "The matrix will be saved to:  {current directory}/" << output_path << endl;
+            cout << endl << "The matrix will be saved to: /" << output_path << endl;
     }
 
     catch(exception& e) {
-        cerr << "error: " << e.what() << "\n";
-        return std::make_tuple("", "", "", "");
+        cout << "Error: " << e.what() << "\n";
+        exit(1);
     }
 
     return std::make_tuple(fixed_filepath, moving_filepath, output_path, reg_type);
@@ -353,6 +367,15 @@ int main(int ac, char* av[])
     eig::MatrixXf fixed = read_matrix_new(fixed_filepath);
     eig::MatrixXf moving = read_matrix_new(moving_filepath);
     eig::MatrixXf output;
+    try{
+        if (moving.rows() < 3 || fixed.rows() < 3){throw(myexception("PBReg requires at least three points to work."));}
+        if (moving.rows() != fixed.rows() 
+            && reg_type != "sbreg"){throw(myexception("PBReg requires equal numbers of fixed and moving points."));}
+        }
+    catch(exception& e) {
+    cout << "Error: " << e.what() << "\n";
+    exit(1);
+    }
 
     if(reg_type=="sbreg"){
         // Employ ICP method to calculate output matrix

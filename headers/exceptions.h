@@ -1,16 +1,15 @@
 #include <iostream>
 #include <exception>
-
+#include <string>
 
 #ifndef EXCEPTIONS
 #define EXCEPTIONS
 
-class myexception: public std::exception
+class myexception: public std::runtime_error
 {
-  virtual const char* what() const throw()
-  {
-    return "My exception happened";
-  }
-} myex;
+  public: 
+    myexception(std::string error_msg = "Runtime exception caught. Terminating program."): runtime_error(error_msg){}
+    
+};
 
 #endif
